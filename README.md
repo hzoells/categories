@@ -16,3 +16,7 @@ All players request a full list of player responses. They recieve a list of ques
 The host post scores to /games/<game_name>/scores
 #### 7. View scores
 Players can view cumulative scores by sending a get request to /games/<game_name>/scores
+
+#### Work to be done:
+-Selecting a letter
+-game cleanup
