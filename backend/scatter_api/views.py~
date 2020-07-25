@@ -1,0 +1,117 @@
+from django.shortcuts import render
+from django.http import HttpResponse, JsonResponse, Http404
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.parsers import JSONParser
+from rest_framework.decorators import api_view
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from scatter_api.models import Question, Answer, Player, Game
+from scatter_api.serializers import QuestionSerializer, AnswerSerializer, PlayerSerializer, GameSerializer, PlayerCreateRequestSerializer
+from scatter_api.requests import CreatePlayerRequest
+import random
+# Create your views here.
+def index(request):
+    return HttpResponse("Hello world This is the scatterAPI")
+
+class QuestionList(APIView):
+    def get(self, request, format=None):
+        questions = Question.objects.all()
+        serializer = QuestionSerializer(questions, many=True)
+        return Response(serializer.data)
+    def post(self, request, format=None):
+        serializer = QuestionSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
+class QuestionDetail(APIView):
+    def get_object(self,pk):
+        try:
+            return Question.objects.get(pk=pk)
+        except Question.DoesNotExist:
+            raise Http404
+    def get(self, request,pk,format=None):
+        question = self.get_object(pk)
+        serializer=QuestionSerializer(question)
+        return Response(serializer.data)
+    def put(self, request, pk, format=None):
+        question=self.get_object(pk)
+        serializer=QuestionSerializer(question,data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+    def delete(self, request, pk, format=None):
+        question = self.get_object(pk=pk)
+        question.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+        
+class GameList(APIView):
+    def newName(self, name):
+        try:
+            Game.objects.get(name=name)
+            return False
+        except Game.DoesNotExist:
+            return True
+    def get(self, request, format=None):
+        games = Game.objects.all()
+        serializer=GameSerializer(games,many=True)
+        return Response(serializer.data)
+    def post(self,request,format=None):
+        serializer = GameSerializer(data=request.data)
+        if serializer.is_valid():
+            questions_per_round=12
+            game = serializer.save(round_number=1)
+            question_numbers=random.sample(range(1,Question.objects.all().count()),3*questions_per_round)
+            for i in range(0,questions_per_round):
+                game.round_one_questions.add(Question.objects.get(pk=question_numbers[i]))
+                game.round_two_questions.add(Question.objects.get(pk=question_numbers[i+questions_per_round]))
+                game.round_three_questions.add(Question.objects.get(pk=question_numbers[i+2*questions_per_round]))
+            serializer = GameSerializer(game)
+            return Response(serializer.data,status=status.HTTP_201_CREATED)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
+class GameDetail(APIView):
+    def get_object(self,game_name):
+        try:
+            return Game.objects.get(name=game_name)
+        except Game.DoesNotExist:
+            raise Http404
+    def get(self, request,game_name,format=None):
+        game = self.get_object(game_name)
+        serializer=GameSerializer(game)
+        return Response(serializer.data)
+    def put(self, request, game_name, format=None):
+        game=self.get_object(game_name)
+        serializer=GameSerializer(game,data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+    def delete(self, request, game_name, format=None):
+        game = self.get_object(game_name)
+        game.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+##We need to be able to create players, answers, but also need to grab all players of a certain game
+class PlayerList(APIView):
+    def get(self,request,format=None):
+        players = Player.objects.all()
+        serializer=PlayerSerializer(players,many=True)
+        return Response(serializer.data)
+    def post(self,request,format=None):
+        serializer = PlayerCreateRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            data = serializer.save()
+            game = Game.objects.get(name=data.game_name)
+            player = Player(
+                name=data.name,
+                game = game,
+                score=0
+            )
+            player.save()
+            serializer = PlayerSerializer(player)
+            return Response(serializer.data,status=status.HTTP_201_CREATED)
+        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
+
