@@ -19,4 +19,5 @@ Players can view cumulative scores by sending a get request to /games/<game_name
 
 #### Work to be done:
 -Selecting a letter
+
 -game cleanup
